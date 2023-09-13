@@ -47,6 +47,7 @@
 #include <signal.h>
 #endif
 
+#include "easy_lock.h"
 #include "urldata.h"
 #include "connect.h"
 #include "cfilters.h"
@@ -56,8 +57,11 @@
 /* copied from hostip.c to switch using SIGALARM for timeouts.
  * SIGALARM has only seconds resolution, so our tests will not work
  * here. */
-#if defined(CURLRES_SYNCH) && \
-    defined(HAVE_ALARM) && defined(SIGALRM) && defined(HAVE_SIGSETJMP)
+#if defined(CURLRES_SYNCH) &&                   \
+  defined(HAVE_ALARM) &&                        \
+  defined(SIGALRM) &&                           \
+  defined(HAVE_SIGSETJMP) &&                    \
+  defined(GLOBAL_INIT_IS_THREADSAFE)
 #define USE_ALARM_TIMEOUT
 #endif
 
@@ -297,10 +301,10 @@ static void check_result(struct test_case *tc,
                     tc->id, stats1->family, (int)stats1->first_created);
       fail(msg);
     }
-#ifndef USE_ALARM_TIMEOUT
-    if(stats2->first_created < tc->he_timeout_ms) {
-#else
+#ifdef USE_ALARM_TIMEOUT
     if(stats2->first_created < 1000) {
+#else
+    if(stats2->first_created < tc->he_timeout_ms) {
 #endif
       curl_msprintf(msg, "%d: expected ip%s to start delayed after %dms, "
                     "instead first attempt made after %dms",
@@ -412,6 +416,10 @@ UNITTEST_START
 
 #if defined(DEBUGBUILD)
   size_t i;
+
+#ifdef USE_ALARM_TIMEOUT
+  fprintf(stderr, "USE_ALARM_TIMEOUT; limited to 1 sec timing resolution\n");
+#endif
 
   for(i = 0; i < sizeof(TEST_CASES)/sizeof(TEST_CASES[0]); ++i) {
     test_connect(&TEST_CASES[i]);
